@@ -20,6 +20,7 @@ INNER JOIN movie AS m ON g.movie_id = m.id
 GROUP BY g.genre
 ORDER BY avg_duration DESC;
 
+
 -- Graf 3: 10 najlepších režisérov podľa počtu nakrútených filmov
 
 SELECT 
@@ -31,7 +32,6 @@ JOIN names n
 GROUP BY n.name
 ORDER BY movie_count DESC
 LIMIT 10;
-
 
 
 -- Graf 4: 3 najlepší režiséri v 3 najlepších žánroch s priemerným hodnotením > 8
@@ -72,10 +72,13 @@ WHERE rm.category IN ('actor', 'actress')
 GROUP BY n.name
 ORDER BY total_roles DESC
 LIMIT 10;
--- Graf 6: 
+
+
+--Graf 6: Počet filmov podľa krajín
 SELECT m.country,
        COUNT(m.id) AS movie_count
 FROM movie AS m
 GROUP BY m.country
 ORDER BY movie_count DESC
 LIMIT 10;
+
