@@ -88,11 +88,11 @@ ON_ERROR = 'CONTINUE';
 
 
 -- dim_movies
-CREATE TABLE dim_movies AS
+CREATE OR REPLACE TABLE dim_movies AS
 SELECT DISTINCT
     id AS movie_id,
     title,
-    year,
+    realese_year,
     duration,
     country,
     languages,
@@ -105,7 +105,8 @@ SELECT DISTINCT
     n.id AS person_id,
     n.name,
     r.category AS role,
-    n.known_for_movies
+    n.known_for_movies,
+    n.date_of_birdth,
 FROM name_staging n
 LEFT JOIN role_mapping_staging r ON n.id = r.name_id;
 
