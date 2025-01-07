@@ -93,11 +93,11 @@ SELECT DISTINCT
     languages,
     production_company
 FROM movies_staging;
-
+```
 ## Dimenzia: `dim_genres`.
 Dimenzia `dim_genres` obsahuje jedinečné žánre používané na klasifikáciu filmov. Umožňuje jednoducho analyzovať filmy podľa ich žánrov.
 
-```ql
+```sql
 CREATE OR REPLACE TABLE dim_genres AS 
 SELECT DISTINCT
     ROW_NUMBER() OVER (ORDER BY genre) AS genre_id,  -- jedinečné ID pre každý žáner
