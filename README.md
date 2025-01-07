@@ -83,24 +83,25 @@ Dimenzie boli navrhnuté tak, aby poskytovali kontext pre tabuľku faktov. Niž�
 Dimenzia `dim_movies` poskytuje podrobné informácie o filmoch vrátane názvu, roku, trvania, krajiny a produkčnej spoločnosti. Táto dimenzia sa považuje za **SCD typu 0**, pretože údaje zostávajú v čase statické. Atribúty ako názov filmu alebo produkčná spoločnosť sa nemenia.
 
 ```sql
-CREATE TABLE dim_movies AS
+CREATE OR REPLACE TABLE dim_movies AS
 SELECT DISTINCT
-    m.id AS dim_movie_id,
-    m.title,
-    m.year,
-    m.duration,
-    m.country,
-    m.production_company
-FROM movies_staging m;
+    id AS movie_id,
+    title,
+    realese_year,
+    duration,
+    country,
+    languages,
+    production_company
+FROM movies_staging;
 
 ## Dimenzia: `dim_genres`.
 Dimenzia `dim_genres` obsahuje jedinečné žánre používané na klasifikáciu filmov. Umožňuje jednoducho analyzovať filmy podľa ich žánrov.
 
 ```ql
-CREATE TABLE dim_genres AS 
+CREATE OR REPLACE TABLE dim_genres AS 
 SELECT DISTINCT
-    ROW_NUMBER() OVER (ORDER BY genre) AS genre_id,
-    žáner AS názov
+    ROW_NUMBER() OVER (ORDER BY genre) AS genre_id,  -- jedinečné ID pre každý žáner
+    genre AS genre_name                             
 FROM genres_staging;
 ```
 
@@ -108,7 +109,7 @@ FROM genres_staging;
 - Typ **SCD:** Typ 0 (statické údaje).
 - **Kľúčové atribúty:**
   - `genre_id` - jedinečný identifikátor žánru.
-  - `name` - Názov žánru.
+  - `ganre_name` - Názov žánru.
 
 
 
@@ -116,14 +117,15 @@ FROM genres_staging;
 Dimenzia `dim_people` uchováva informácie o účastníkoch filmového priemyslu, ako sú herci, režiséri a iné úlohy. Obsahuje ich mená, kategórie rolí a slávne filmy.
 
 ```ql
-CREATE TABLE dim_people AS
+CREATE OR REPLACE TABLE dim_people AS
 SELECT DISTINCT
     n.id AS person_id,
     n.name,
     r.category AS role,
-    n.known_for_movies
-FROM people_staging n
-LEFT JOIN role_mapping r ON n.id = r.name_id;
+    n.known_for_movies,
+    n.date_of_birdth,
+FROM name_staging n
+LEFT JOIN role_mapping_staging r ON n.id = r.name_id;
 ```
 
 ### Charakteristiky:
@@ -132,20 +134,20 @@ LEFT JOIN role_mapping r ON n.id = r.name_id;
   - `person_id` - jedinečný identifikátor osoby.
   - `name` - meno.
   - `role` - kategória roly (napríklad režisér, herec).
+  - `date_of_birdth`-rok narodenial.
 
 ---
 ### Dimenzia: `dim_dates`.
 Dimenzia `dim_dates` poskytuje časový kontext pre analýzu vrátane dňa, mesiaca, roka a ďalších atribútov.
 
 ```ql
-CREATE TABLE dim_dates AS
+CREATE OR REPLACE TABLE dim_dates AS
 SELECT DISTINCT
     ROW_NUMBER() OVER (ORDER BY date_published) AS date_id,
     date_published AS full_date,
-    EXTRACT(YEAR FROM date_published) AS year,
-    EXTRACT(MONTH FROM date_published) AS month,
-    EXTRACT(DAY FROM date_published) AS day,
-    EXTRACT(DOW FROM date_published) + 1 AS day_of_week
+    YEAR(date_published) AS year,
+    MONTH(date_published) AS month,
+    DAY(date_published) AS day
 FROM movies_staging;
 ```
 
@@ -154,29 +156,7 @@ FROM movies_staging;
 - Kľúčové atribúty:**.
   - `date_id` - jedinečný identifikátor dátumu.
   - `full_date` - Úplný dátum.
-  - `rok`, `mesiac`, `deň`, `deň_týždňa` - časové atribúty.
-
----
-
-### Dimenzia: `dim_ratings`.
-Dimenzia `dim_ratings` umožňuje analyzovať hodnotenia filmov vrátane priemerného hodnotenia, počtu hlasov a mediánu.
-
-```ql
-CREATE TABLE dim_ratings AS
-SELECT DISTINCT
-    movie_id,
-    avg_rating,
-    total_votes,
-    median_rating
-FROM ratings_staging;
-```
-
-### Charakteristiky:
-- **SCD typ:** Typ 1 (aktualizovateľné údaje).
-- **Kľúčové atribúty:**
-  - `movie_id` - jedinečný identifikátor filmu.
-  - `avg_rating` - Priemerné hodnotenie.
-  - `total_votes` - Počet hlasov.
+  - `rok`, `mesiac`, `deň`, - časové atribúty.
 
 ---
 
@@ -185,20 +165,21 @@ FROM ratings_staging;
 Tabuľka faktov `fact_movies` obsahuje všetky kľúčové vzťahy medzi dimenziou a metrikami, ako je trvanie, počet hlasov, hodnotenie a identifikátory žánru a osoby.
 
 ```ql
-CREATE TABLE fact_movies AS
+CREATE OR REPLACE TABLE fact_movies AS
 SELECT DISTINCT
-    m.id AS movie_id,
-    g.genre_id,
-    p.person_id AS director_id,
-    d.date_id,
-    r.total_votes,
-    r.avg_rating,
-    m.duration
+    m.id AS movie_id,                 
+    dg.genre_id,                      
+    p.person_id AS director_id,       
+    d.date_id,                        
+    r.total_votes,                    
+    r.avg_rating,                     
+    m.duration                        
 FROM movies_staging m
-LEFT JOIN dim_ratings r ON m.id = r.movie_id
-LEFT JOIN dim_genres g ON m.id = g.movie_id
-LEFT JOIN dim_people p ON m.id = p.known_for_movies
-LEFT JOIN dim_dates d ON m.date_published = d.full_date;
+LEFT JOIN ratings_staging r ON m.id = r.movie_id         
+LEFT JOIN genres_staging g ON m.id = g.movie_id           
+LEFT JOIN dim_genres dg ON g.genre = dg.genre_name        
+LEFT JOIN dim_people p ON p.role = 'Director' AND m.id = p.known_for_movies 
+LEFT JOIN dim_dates d ON m.date_published = d.full_date; 
 ```
 
 ### Vlastnosti:
