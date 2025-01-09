@@ -37,7 +37,6 @@ Vyvinuli sme model v tvare hviezdy (**Hviezdna schéma**) na viacrozmernú anal�
 - **dim_movies**: Podrobné informácie o filmoch.
 - **dim_žánre**: Informácie o žánroch.
 - **dim_people**: Informácie o ľuďoch (režiséri, herci).
-- **dim_dates**: Informácie o dátume (deň, mesiac, rok).
 
 Štruktúra hviezdicového modelu je znázornená na diagrame nižšie. Diagram ukazuje prepojenia medzi faktovou tabuľkou a dimenziami, čo zjednodušuje pochopenie a implementáciu modelu.
 <p align="center">
@@ -137,30 +136,6 @@ LEFT JOIN role_mapping_staging r ON n.id = r.name_id;
   - `date_of_birdth`-rok narodenial.
 
 ---
-### Dimenzia: `dim_dates`.
-Dimenzia `dim_dates` poskytuje časový kontext pre analýzu vrátane dňa, mesiaca, roka a ďalších atribútov.
-
-```ql
-CREATE OR REPLACE TABLE dim_dates AS
-SELECT DISTINCT
-    ROW_NUMBER() OVER (ORDER BY date_published) AS date_id,
-    date_published AS full_date,
-    YEAR(date_published) AS year,
-    MONTH(date_published) AS month,
-    DAY(date_published) AS day
-FROM movies_staging;
-```
-
-### Charakteristiky:
-- **SCD typ:** Typ 0 (statické údaje).
-- Kľúčové atribúty:**.
-  - `date_id` - jedinečný identifikátor dátumu.
-  - `full_date` - Úplný dátum.
-  - `rok`, `mesiac`, `deň`, - časové atribúty.
-
----
-
-
 ### Faktová tabuľka: `fact_movies`.
 Tabuľka faktov `fact_movies` obsahuje všetky kľúčové vzťahy medzi dimenziou a metrikami, ako je trvanie, počet hlasov, hodnotenie a identifikátory žánru a osoby.
 
@@ -169,8 +144,7 @@ CREATE OR REPLACE TABLE fact_movies AS
 SELECT DISTINCT
     m.id AS movie_id,                 
     dg.genre_id,                      
-    p.person_id AS director_id,       
-    d.date_id,                        
+    p.person_id AS director_id,                             
     r.total_votes,                    
     r.avg_rating,                     
     m.duration                        
@@ -178,8 +152,7 @@ FROM movies_staging m
 LEFT JOIN ratings_staging r ON m.id = r.movie_id         
 LEFT JOIN genres_staging g ON m.id = g.movie_id           
 LEFT JOIN dim_genres dg ON g.genre = dg.genre_name        
-LEFT JOIN dim_people p ON p.role = 'Director' AND m.id = p.known_for_movies 
-LEFT JOIN dim_dates d ON m.date_published = d.full_date; 
+LEFT JOIN dim_people p ON p.role = 'Director' AND m.id = p.known_for_movies;
 ```
 
 ### Vlastnosti:
