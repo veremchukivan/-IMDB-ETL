@@ -1,12 +1,10 @@
--- Vytvorenie databázy
 CREATE DATABASE imdb_etl;
 
--- Vytvorenie schémy pre staging-table
 CREATE SCHEMA imdb_etl.staging;
 
 USE imdb_etl.staging;
 
--- Vytvorenie staging-table
+-- creat staging table
 CREATE OR REPLACE TABLE movies_staging (
     id VARCHAR(10) PRIMARY KEY,
     title VARCHAR(200),
@@ -29,7 +27,7 @@ CREATE OR REPLACE TABLE name_staging (
     id VARCHAR(10) PRIMARY KEY,
     name VARCHAR(100),
     height INT,
-    date_of_birdth DATE,
+    date_of_birth DATE,
     known_for_movies VARCHAR(100)
 );
 
@@ -54,19 +52,16 @@ CREATE OR REPLACE TABLE role_mapping_staging (
     PRIMARY KEY (movie_id, name_id)
 );
 
-
-
+-- create stage
 CREATE OR REPLACE STAGE imdbSt;
 
-
--- Načítanie údajov do tabuliek na analýzu
+-- load dat
 COPY INTO movies_staging
 FROM @imdbSt/movie.csv
 FILE_FORMAT = (TYPE = 'CSV' FIELD_OPTIONALLY_ENCLOSED_BY = '"' SKIP_HEADER = 1);
 
-
 COPY INTO genres_staging
-FROM @imdbSt/ganre.csv
+FROM @imdbSt/genre.csv
 FILE_FORMAT = (TYPE = 'CSV' FIELD_OPTIONALLY_ENCLOSED_BY = '"' SKIP_HEADER = 1);
 
 COPY INTO role_mapping_staging
@@ -86,14 +81,13 @@ FROM @imdbSt/names.csv
 FILE_FORMAT = (TYPE = 'CSV' FIELD_OPTIONALLY_ENCLOSED_BY = '"' SKIP_HEADER = 1)
 ON_ERROR = 'CONTINUE';
 
-
 -- dim_movies
 CREATE OR REPLACE TABLE dim_movies AS
 SELECT DISTINCT
     id AS movie_id,
     title,
-    realese_year,
-    full_date
+    year,
+    date_published,
     duration,
     country,
     languages,
@@ -107,10 +101,9 @@ SELECT DISTINCT
     n.name,
     r.category AS role,
     n.known_for_movies,
-    n.date_of_birdth,
+    n.date_of_birth
 FROM name_staging n
 LEFT JOIN role_mapping_staging r ON n.id = r.name_id;
-
 
 -- dim_dates
 CREATE OR REPLACE TABLE dim_dates AS
@@ -122,17 +115,15 @@ SELECT DISTINCT
     DAY(date_published) AS day
 FROM movies_staging;
 
-
 -- dim_genres
 CREATE OR REPLACE TABLE dim_genres AS 
 SELECT DISTINCT
-    ROW_NUMBER() OVER (ORDER BY genre) AS genre_id,  -- jedinečné ID pre každý žáner
+    ROW_NUMBER() OVER (ORDER BY genre) AS genre_id,
     genre AS genre_name                             
 FROM genres_staging;
 
--- Faktografická tabuľka so žánrami
-
-CREATE OR REPLACE TABLE fact_ratings AS
+-- fact_movies
+CREATE OR REPLACE TABLE fact_movies AS
 SELECT DISTINCT
     m.id AS movie_id,                 
     dg.genre_id,                      
@@ -144,12 +135,12 @@ FROM movies_staging m
 LEFT JOIN ratings_staging r ON m.id = r.movie_id         
 LEFT JOIN genres_staging g ON m.id = g.movie_id           
 LEFT JOIN dim_genres dg ON g.genre = dg.genre_name        
-LEFT JOIN dim_people p ON p.role = 'Director' AND m.id = p.known_for_movies 
+LEFT JOIN dim_people p ON p.role = 'Director' AND m.id = p.known_for_movies;
 
-
--- Odstránenie stagingových tabuliek
+-- delating staging table
 DROP TABLE IF EXISTS movies_staging;
 DROP TABLE IF EXISTS genres_staging;
-DROP TABLE IF EXISTS people_staging;
+DROP TABLE IF EXISTS role_mapping_staging;
+DROP TABLE IF EXISTS director_mapping_staging;
 DROP TABLE IF EXISTS ratings_staging;
-DROP TABLE IF EXISTS dates_staging;
+DROP TABLE IF EXISTS name_staging;
