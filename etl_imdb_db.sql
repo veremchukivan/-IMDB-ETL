@@ -93,6 +93,7 @@ SELECT DISTINCT
     id AS movie_id,
     title,
     realese_year,
+    full_date
     duration,
     country,
     languages,
@@ -131,12 +132,11 @@ FROM genres_staging;
 
 -- Faktografická tabuľka so žánrami
 
-CREATE OR REPLACE TABLE fact_movies AS
+CREATE OR REPLACE TABLE fact_ratings AS
 SELECT DISTINCT
     m.id AS movie_id,                 
     dg.genre_id,                      
-    p.person_id AS director_id,       
-    d.date_id,                        
+    p.person_id AS director_id,                             
     r.total_votes,                    
     r.avg_rating,                     
     m.duration                        
@@ -145,7 +145,6 @@ LEFT JOIN ratings_staging r ON m.id = r.movie_id
 LEFT JOIN genres_staging g ON m.id = g.movie_id           
 LEFT JOIN dim_genres dg ON g.genre = dg.genre_name        
 LEFT JOIN dim_people p ON p.role = 'Director' AND m.id = p.known_for_movies 
-LEFT JOIN dim_dates d ON m.date_published = d.full_date; 
 
 
 -- Odstránenie stagingových tabuliek
