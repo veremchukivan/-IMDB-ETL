@@ -104,17 +104,6 @@ SELECT DISTINCT
     n.date_of_birth
 FROM name_staging n
 LEFT JOIN role_mapping_staging r ON n.id = r.name_id;
-
--- dim_dates
-CREATE OR REPLACE TABLE dim_dates AS
-SELECT DISTINCT
-    ROW_NUMBER() OVER (ORDER BY date_published) AS date_id,
-    date_published AS full_date,
-    YEAR(date_published) AS year,
-    MONTH(date_published) AS month,
-    DAY(date_published) AS day
-FROM movies_staging;
-
 -- dim_genres
 CREATE OR REPLACE TABLE dim_genres AS 
 SELECT DISTINCT
