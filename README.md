@@ -86,12 +86,14 @@ CREATE OR REPLACE TABLE dim_movies AS
 SELECT DISTINCT
     id AS movie_id,
     title,
-    realese_year,
+    year,
+    date_published,
     duration,
     country,
     languages,
     production_company
 FROM movies_staging;
+
 ```
 ## Dimenzia: `dim_genres`.
 Dimenzia `dim_genres` obsahuje jedinečné žánre používané na klasifikáciu filmov. Umožňuje jednoducho analyzovať filmy podľa ich žánrov.
@@ -99,7 +101,7 @@ Dimenzia `dim_genres` obsahuje jedinečné žánre používané na klasifikáciu
 ```sql
 CREATE OR REPLACE TABLE dim_genres AS 
 SELECT DISTINCT
-    ROW_NUMBER() OVER (ORDER BY genre) AS genre_id,  -- jedinečné ID pre každý žáner
+    ROW_NUMBER() OVER (ORDER BY genre) AS genre_id,
     genre AS genre_name                             
 FROM genres_staging;
 ```
@@ -122,7 +124,7 @@ SELECT DISTINCT
     n.name,
     r.category AS role,
     n.known_for_movies,
-    n.date_of_birdth,
+    n.date_of_birth
 FROM name_staging n
 LEFT JOIN role_mapping_staging r ON n.id = r.name_id;
 ```
@@ -163,7 +165,7 @@ LEFT JOIN dim_people p ON p.role = 'Director' AND m.id = p.known_for_movies;
   - `total_votes` - Počet hlasov.
   - `duration` - Trvanie filmu.
 - Vzťahy:**
-  - Súvisí so všetkými dimenziami (`dim_filmov`, `dim_žánrov`, `dim_ľudí`, `dim_dátum`).
+  - Súvisí so všetkými dimenziami (`dim_filmov`, `dim_žánrov`, `dim_ľudí`).
 
 
 ---
