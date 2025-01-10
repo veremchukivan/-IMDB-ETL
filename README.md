@@ -91,6 +91,19 @@ SELECT DISTINCT
     production_company
 FROM movies_staging;
 ```
+### Charakteristiky:
+- **SCD typ:** Typ 0 (statické údaje, bez historických zmien).
+- **Kľúčové atribúty:**
+  - `movie_id` - Jedinečný identifikátor filmu.
+  - `title` - Názov filmu.
+  - `year` - Rok vydania.
+  - `duration` - Trvanie filmu v minútach.
+  - `country` - Krajina pôvodu.
+  - `languages` - Jazyky použité vo filme.
+  - `production_company` - Produkčná spoločnosť.
+
+---
+
 
 ---
 
@@ -104,7 +117,11 @@ SELECT DISTINCT
     genre AS genre_name                             
 FROM genres_staging;
 ```
-
+### Charakteristiky:
+- **SCD typ:** Typ 0 (statické údaje).
+- **Kľúčové atribúty:**
+  - `genre_id` - Jedinečný identifikátor žánru.
+  - `genre_name` - Názov žánru.
 ---
 
 #### **Dimenzia: dim_people**
@@ -121,6 +138,14 @@ SELECT DISTINCT
 FROM name_staging n
 LEFT JOIN role_mapping_staging r ON n.id = r.name_id;
 ```
+### Charakteristiky:
+- **SCD typ:** Typ 1 (aktualizácia údajov, keď sa zmenia).
+- **Kľúčové atribúty:**
+  - `person_id` - Jedinečný identifikátor osoby.
+  - `name` - Meno osoby.
+  - `role` - Úloha osoby (napr. režisér, herec).
+  - `date_of_birth` - Dátum narodenia.
+  - `known_for_movies` - Zoznam známych filmov.
 
 ---
 
@@ -142,6 +167,15 @@ LEFT JOIN genres_staging g ON m.id = g.movie_id
 LEFT JOIN dim_genres dg ON g.genre = dg.genre_name        
 LEFT JOIN dim_people p ON p.role = 'Director' AND m.id = p.known_for_movies;
 ```
+### Charakteristiky:
+- **Primárne metriky:**
+  - `avg_rating` - Priemerné hodnotenie filmu.
+  - `total_votes` - Celkový počet hlasov pre film.
+  - `duration` - Trvanie filmu v minútach.
+- **Vzťahy:**
+  - Súvisí s dimenziami `dim_movies`, `dim_genres`, a `dim_people`.
+- **Použitie:**
+  - Základ pre analýzu hodnotení filmov podľa žánrov, režisérov a iných aspektov.
 
 ---
 
