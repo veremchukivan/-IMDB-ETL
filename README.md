@@ -1,29 +1,30 @@
- **Proces ETL pre databázu IMDb**
- ____
+# **ETL proces pre databázu IMDb**
 
- Tento repozitár obsahuje implementáciu procesu ETL v programe Snowflake na analýzu údajov databázy IMDb. Projekt sa zameriava na štúdium správania používateľov, žánrov a popularity filmov na základe ich hodnotení. Výsledný dátový model umožňuje viacrozmernú analýzu a vizualizáciu kľúčových ukazovateľov.
+---
 
-___
-## **1. Úvod a popis zdrojových dát** 
-Cieľom projektu je analyzovať údaje týkajúce sa filmov, žánrov, režisérov, hercov a ich hodnotenia. Táto analýza nám umožňuje identifikovať trendy v žánroch, najpopulárnejšie filmy a kľúčové údaje o hodnotení.
+Tento repozitár obsahuje implementáciu ETL procesu v Snowflake na analýzu údajov IMDb. Projekt sa zameriava na štúdium správania používateľov, žánrov a popularity filmov na základe ich hodnotení. Výsledná model dát umožňuje viacrozmernú analýzu a vizualizáciu kľúčových ukazovateľov.
 
-Údaje obsahujú päť hlavných tabuliek:
-- **movie** 
-- **rating** .
-- **ganre** 
+---
+
+## **1. Úvod a popis zdrojových údajov**
+Cieľom projektu je analyzovať údaje týkajúce sa filmov, žánrov, réžisérov, hercov a ich hodnotenia. Tento proces pomáha určiť trendy v žánroch, najpopulárnejšie filmy a kľúčové štatistiky.
+
+Dáta obsahujú päť hlavných tabuliek:
+- **movies**
+- **ratings**
+- **genres**
 - **director_mapping**
 - **role_mapping**
 - **names**
 
-
-Účelom ETL procesu bolo tieto dáta pripraviť, transformovať a sprístupniť pre viacdimenzionálnu analýzu.
+ETL proces bol vytvorený na pripravenie, transformáciu a sprístupnenie údajov pre viacrozmernú analýzu.
 
 ---
 
-### **1.1 Dátová architektúra**
+## **1.1 Architektúra údajov**
 
 ### **ERD diagram**
-Surové dáta sú usporiadané v relačnom modeli, ktorý je znázornený na entitno-relačnom diagrame (ERD):
+Surové dáta sú organizované v relačnom modeli, ktorý je znázorněný na ERD-diagrame:
 
 <p align="center">
   <img src="./IMDB_ERD.png" alt="ERD Schema">
@@ -31,53 +32,51 @@ Surové dáta sú usporiadané v relačnom modeli, ktorý je znázornený na ent
   <em>Obrázok 1 Entitno-relačná schéma IMDB</em>
 </p>
 
-___
-### 2. **Dimenzionálny model**.
-Vyvinuli sme model v tvare hviezdy (**Hviezdna schéma**) na viacrozmernú analýzu. Centrálnou tabuľkou je faktografická tabuľka `fact_movies`, ktorá je prepojená s nasledujúcimi dimenziami:
-- **dim_movies**: Podrobné informácie o filmoch.
-- **dim_žánre**: Informácie o žánroch.
-- **dim_people**: Informácie o ľuďoch (režiséri, herci).
+---
 
-Štruktúra hviezdicového modelu je znázornená na diagrame nižšie. Diagram ukazuje prepojenia medzi faktovou tabuľkou a dimenziami, čo zjednodušuje pochopenie a implementáciu modelu.
+## **2. Viacrozmerná modelácia**
+Model bol navrhnutý v tvare hviezdy (**Star Schema**) na viacrozmernú analýzu. Centrálnou tabuľkou je faktografická tabuľka `fact_movies`, ktorá je prepojená s nasledujúcimi dimenziami:
+- **dim_movies**: Podrobnosti o filmoch.
+- **dim_genres**: Informácie o žánroch.
+- **dim_people**: Informácie o hercoch a réžiséroch.
+
 <p align="center">
   <img src="./star_schema.png" alt="ERD Schema">
   <br>
   <em>Obrázok 2 Schéma hviezdy pre IMDB</em>
 </p>
 
-___
+---
+
 ## **3. ETL proces v Snowflake**
-ETL proces pozostával z troch hlavných fáz: `extrahovanie` (Extract), `transformácia` (Transform) a `načítanie` (Load). Tento proces bol implementovaný v Snowflake s cieľom pripraviť zdrojové dáta zo staging vrstvy do viacdimenzionálneho modelu vhodného na analýzu a vizualizáciu.
-___
-### **3.1 Extract (Extrahovanie dát)**
-Údaje z pôvodného súboru údajov (vo formáte `csv`) boli najprv načítané do programu Snowflake prostredníctvom interného úložiska imdbSt. Etapa v programe Snowflake slúži ako dočasný priestor na import alebo export údajov. Etapa bola vytvorená pomocou nasledujúceho príkazu:
-#### Príklad kódu:
+ETL proces zahŕňal tri hlavné fázy: `Extract`, `Transform` a `Load`. Tento proces pripravil dáta na analýzu a vizualizáciu.
+
+---
+
+### **3.1 Extract (Extrakcia údajov)**
+
+Dáta boli načítané do Snowflake cez interné stage úložisko `imdbSt`. Stage bol vytvorený nasledovne:
+
 ```sql
 CREATE OR REPLACE STAGE imdbSt;
 ```
-Potom boli do fázy načítané súbory obsahujúce informácie o filmoch, žánroch, názvoch, hodnoteniach, režiséroch a úlohách. Údaje sa importovali do tabuliek stagingu pomocou príkazu COPY INTO. Podobný dotaz sa použil pre každú tabuľku:
+
+Potom boli do neho načítané súbory obsahujúce filmy, žánre, hercov, hodnotenia a úlohy. Príklad načítania:
+
 ```sql
-COPY INTO name_staging
-FROM @imdbSt/names.csv
-FILE_FORMAT = (TYPE = 'CSV' FIELD_OPTIONALLY_ENCLOSED_BY = '"' SKIP_HEADER = 1)
-ON_ERROR = 'CONTINUE';
+COPY INTO movies_staging
+FROM @imdbSt/movie.csv
+FILE_FORMAT = (TYPE = 'CSV' FIELD_OPTIONALLY_ENCLOSED_BY = '"' SKIP_HEADER = 1);
 ```
 
-V prípade nekonzistentných záznamov bol použitý parameter `ON_ERROR = 'CONTINUE'`, ktorý zabezpečil pokračovanie procesu bez prerušenia pri chybách.
-
----
-### **3.1 Transfor (Transformácia dát)**
-
-V tejto fáze boli údaje z tabuliek etapy vyčistené, transformované a obohatené. Hlavným cieľom bolo pripraviť dimenzie a tabuľku faktov, ktoré umožnia jednoduchú a efektívnu analýzu.
-
 ---
 
-### Návrh dimenzií
+### **3.2 Transform (Transformácia údajov)**
 
-Dimenzie boli navrhnuté tak, aby poskytovali kontext pre tabuľku faktov. Nižšie je uvedená transformačná logika pre každú dimenziu.
+V tejto fáze boli staging tabuľky transformované na dimenzie a faktografickú tabuľku.
 
 #### **Dimenzia: dim_movies**
-Dimenzia `dim_movies` poskytuje podrobné informácie o filmoch vrátane názvu, roku, trvania, krajiny a produkčnej spoločnosti. Táto dimenzia sa považuje za **SCD typu 0**, pretože údaje zostávajú v čase statické. Atribúty ako názov filmu alebo produkčná spoločnosť sa nemenia.
+Obsahuje informácie o filmoch, vrátane názvu, roku, trvania a produkčnej spoločnosti.
 
 ```sql
 CREATE OR REPLACE TABLE dim_movies AS
@@ -91,10 +90,12 @@ SELECT DISTINCT
     languages,
     production_company
 FROM movies_staging;
-
 ```
-## Dimenzia: `dim_genres`.
-Dimenzia `dim_genres` obsahuje jedinečné žánre používané na klasifikáciu filmov. Umožňuje jednoducho analyzovať filmy podľa ich žánrov.
+
+---
+
+#### **Dimenzia: dim_genres**
+Obsahuje jedinečné žánre.
 
 ```sql
 CREATE OR REPLACE TABLE dim_genres AS 
@@ -104,18 +105,12 @@ SELECT DISTINCT
 FROM genres_staging;
 ```
 
-### Charakteristika:
-- Typ **SCD:** Typ 0 (statické údaje).
-- **Kľúčové atribúty:**
-  - `genre_id` - jedinečný identifikátor žánru.
-  - `ganre_name` - Názov žánru.
+---
 
+#### **Dimenzia: dim_people**
+Uchováva informácie o hercoch a réžiséroch vrátane ich mien a rolí.
 
-
-### Dimenzia: `dim_people`
-Dimenzia `dim_people` uchováva informácie o účastníkoch filmového priemyslu, ako sú herci, režiséri a iné úlohy. Obsahuje ich mená, kategórie rolí a slávne filmy.
-
-```ql
+```sql
 CREATE OR REPLACE TABLE dim_people AS
 SELECT DISTINCT
     n.id AS person_id,
@@ -127,19 +122,12 @@ FROM name_staging n
 LEFT JOIN role_mapping_staging r ON n.id = r.name_id;
 ```
 
-### Charakteristiky:
-- **SCD typ:** Typ 1 (aktualizovateľné údaje).
-- Kľúčové atribúty:**.
-  - `person_id` - jedinečný identifikátor osoby.
-  - `name` - meno.
-  - `role` - kategória roly (napríklad režisér, herec).
-  - `date_of_birdth`-rok narodenial.
-
 ---
-### Faktová tabuľka: `fact_movies`.
-Tabuľka faktov `fact_movies` obsahuje všetky kľúčové vzťahy medzi dimenziou a metrikami, ako je trvanie, počet hlasov, hodnotenie a identifikátory žánru a osoby.
 
-```ql
+#### **Faktografická tabuľka: fact_movies**
+Tabuľka obsahuje vzťahy medzi dimenziami a kľúčové metriky.
+
+```sql
 CREATE OR REPLACE TABLE fact_movies AS
 SELECT DISTINCT
     m.id AS movie_id,                 
@@ -155,30 +143,20 @@ LEFT JOIN dim_genres dg ON g.genre = dg.genre_name
 LEFT JOIN dim_people p ON p.role = 'Director' AND m.id = p.known_for_movies;
 ```
 
-### Vlastnosti:
-
-
-- **Fakty:**
-  - `avg_rating` - Priemerné hodnotenie.
-  - `total_votes` - Počet hlasov.
-  - `duration` - Trvanie filmu.
-- Vzťahy:**
-  - Súvisí so všetkými dimenziami (`dim_filmov`, `dim_žánrov`, `dim_ľudí`).
-
-
 ---
- ### **3.3 Load (Načítanie dát)**
-Po úspešnom vytvorení dimenzií a faktovej tabuľky boli dáta nahraté do finálnej štruktúry. Na záver boli staging tabuľky odstránené, aby sa optimalizovalo využitie úložiska:
+
+### **3.3 Load (Načítanie údajov)**
+
+Na záver boli staging tabuľky odstránené:
+
 ```sql
 DROP TABLE IF EXISTS movies_staging;
 DROP TABLE IF EXISTS genres_staging;
-DROP TABLE IF EXISTS people_staging;
+DROP TABLE IF EXISTS role_mapping_staging;
+DROP TABLE IF EXISTS director_mapping_staging;
 DROP TABLE IF EXISTS ratings_staging;
-DROP TABLE IF EXISTS dates_staging;
+DROP TABLE IF EXISTS name_staging;
 ```
-ETL proces v Snowflake umožnil spracovanie pôvodných dát z `.csv` formátu do viacdimenzionálneho modelu typu hviezda. Tento proces zahŕňal čistenie, obohacovanie a reorganizáciu údajov. Výsledný model umožňuje analýzu čitateľských preferencií a správania používateľov, pričom poskytuje základ pre vizualizácie a reporty.
-
----
 ## **4 Vizualizácia dát**
 Panel obsahuje 6 vizualizácií, ktoré poskytujú základný prehľad kľúčových ukazovateľov a trendov týkajúcich sa aktivity používateľov, popularity žánrov, režisérov a hercov, ako aj finančnej analýzy.
 
