@@ -79,6 +79,7 @@ V tejto fáze boli staging tabuľky transformované na dimenzie a faktografickú
 Obsahuje informácie o filmoch, vrátane názvu, roku, trvania a produkčnej spoločnosti.
 
 ```sql
+-- dim_movies
 CREATE OR REPLACE TABLE dim_movies AS
 SELECT DISTINCT
     id AS movie_id,
@@ -113,14 +114,14 @@ Obsahuje jedinečné žánre.
 ```sql
 CREATE OR REPLACE TABLE dim_genres AS 
 SELECT DISTINCT
-    ROW_NUMBER() OVER (ORDER BY genre) AS genre_id,
+    genre AS genre_id,    
     genre AS genre_name                             
 FROM genres_staging;
 ```
 ### Charakteristiky:
 - **SCD typ:** Typ 0 (statické údaje).
 - **Kľúčové atribúty:**
-  - `genre_id` - Jedinečný identifikátor žánru.
+  - `genre_id` -  identifikátor žánru.
   - `genre_name` - Názov žánru.
 ---
 
@@ -134,9 +135,11 @@ SELECT DISTINCT
     n.name,
     r.category AS role,
     n.known_for_movies,
-    n.date_of_birth
+    n.date_of_birth,
+    dms.movie_id AS directed_movie_id  
 FROM name_staging n
-LEFT JOIN role_mapping_staging r ON n.id = r.name_id;
+LEFT JOIN role_mapping_staging r ON n.id = r.name_id
+LEFT JOIN director_mapping_staging dms ON n.id = dms.name_id;  
 ```
 ### Charakteristiky:
 - **SCD typ:** Typ 1 (aktualizácia údajov, keď sa zmenia).
@@ -156,8 +159,8 @@ Tabuľka obsahuje vzťahy medzi dimenziami a kľúčové metriky.
 CREATE OR REPLACE TABLE fact_movies AS
 SELECT DISTINCT
     m.id AS movie_id,                 
-    dg.genre_id,                      
-    p.person_id AS director_id,                             
+    dg.genre_id,                       
+    dp.person_id AS director_id,     
     r.total_votes,                    
     r.avg_rating,                     
     m.duration                        
@@ -165,7 +168,7 @@ FROM movies_staging m
 LEFT JOIN ratings_staging r ON m.id = r.movie_id         
 LEFT JOIN genres_staging g ON m.id = g.movie_id           
 LEFT JOIN dim_genres dg ON g.genre = dg.genre_name        
-LEFT JOIN dim_people p ON p.role = 'Director' AND m.id = p.known_for_movies;
+LEFT JOIN dim_people dp ON dp.known_for_movies = m.id;
 ```
 ### Charakteristiky:
 - **Primárne metriky:**
