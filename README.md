@@ -206,17 +206,14 @@ Táto vizualizácia ukazuje porovnanie počtu filmov, ktoré boli vyrobené v US
 
 ```sql
 SELECT 
-    m.country AS country,
-    COUNT(m.id) AS number_of_movies
-FROM 
-    movie AS m
-WHERE 
-    m.country IN ('USA', 'India') 
-    AND m.year = 2019
-GROUP BY 
-    m.country
-ORDER BY 
-    number_of_movies DESC;
+    dm.country AS country,
+    COUNT(dm.movie_id) AS number_of_movies
+FROM dim_movies AS dm
+WHERE dm.country IN ('USA', 'India') 
+  AND dm.year = 2019
+GROUP BY dm.country
+ORDER BY number_of_movies DESC;
+
 
 ```
 ----
@@ -224,12 +221,16 @@ ORDER BY
 Táto vizualizácia zobrazuje priemernú dĺžku filmov pre jednotlivé žánre. Pomáha identifikovať žánre, ktoré typicky obsahujú dlhšie alebo kratšie filmy.
 
 ```sql
-SELECT g.genre AS genre,
-       ROUND(AVG(m.duration), 2) AS avg_duration
-FROM genre AS g
-INNER JOIN movie AS m ON g.movie_id = m.id
-GROUP BY g.genre
-ORDER BY avg_duration DESC;
+SELECT 
+    dg.genre_name AS genre,
+    ROUND(AVG(fm.duration), 2) AS avg_duration
+FROM 
+    dim_genres AS dg
+INNER JOIN fact_movies AS fm ON dg.genre_id = fm.genre_id
+GROUP BY 
+    dg.genre_name
+ORDER BY 
+    avg_duration DESC;
 
 ```
 ----
@@ -237,73 +238,88 @@ ORDER BY avg_duration DESC;
 Táto vizualizácia zobrazuje 10 najproduktívnejších režisérov na základe počtu filmov, ktoré režírovali. Umožňuje analyzovať, ktorí režiséri sú najaktívnejší v priemysle.
 ```sql
 SELECT 
-    n.name AS director_name,
-    COUNT(dm.movie_id) AS movie_count
-FROM director_mapping dm
-JOIN names n 
-    ON dm.name_id = n.id
-GROUP BY n.name
-ORDER BY movie_count DESC
+    dp.name AS director_name,
+    COUNT(fm.movie_id) AS movie_count
+FROM 
+    fact_movies AS fm
+JOIN dim_people AS dp ON fm.director_id = dp.person_id
+GROUP BY 
+    dp.name
+ORDER BY 
+    movie_count DESC
 LIMIT 10;
 ```
----
 ## Graf 4: 3 najlepší režiséri v 3 najlepších žánroch s priemerným hodnotením > 8
 Táto vizualizácia identifikuje troch najlepších režisérov v troch najlepších žánroch, ktorých filmy majú priemerné hodnotenie vyššie ako 8. Poskytuje pohľad na kvalitu filmov a úspešnosť režisérov.
 ```sql
 WITH top3_genre AS (
-    SELECT g.genre,
-           COUNT(g.movie_id) AS movie_count
-    FROM genre AS g
-    INNER JOIN ratings AS r ON g.movie_id = r.movie_id
-    WHERE r.avg_rating > 8
-    GROUP BY g.genre
-    ORDER BY movie_count DESC
+    SELECT 
+        dg.genre_name AS genre,
+        COUNT(fm.movie_id) AS movie_count
+    FROM 
+        fact_movies AS fm
+    INNER JOIN dim_genres AS dg ON fm.genre_id = dg.genre_id
+    INNER JOIN ratings_staging AS r ON fm.movie_id = r.movie_id
+    WHERE 
+        r.avg_rating > 6
+    GROUP BY 
+        dg.genre_name
+    ORDER BY 
+        movie_count DESC
     LIMIT 3
 ),
 top3_director AS (
-    SELECT n.name AS director_name,
-           COUNT(g.movie_id) AS movie_count,
-           ROW_NUMBER() OVER (ORDER BY COUNT(g.movie_id) DESC) AS director_rank
-    FROM names AS n
-    INNER JOIN director_mapping AS dm ON n.id = dm.name_id
-    INNER JOIN genre AS g ON dm.movie_id = g.movie_id
-    INNER JOIN ratings AS r ON r.movie_id = g.movie_id
-    WHERE g.genre IN (SELECT genre FROM top3_genre)
-      AND r.avg_rating > 8
-    GROUP BY n.name
+    SELECT 
+        dp.name AS director_name,
+        COUNT(fm.movie_id) AS movie_count,
+        ROW_NUMBER() OVER (PARTITION BY dg.genre_name ORDER BY COUNT(fm.movie_id) DESC) AS director_rank
+    FROM 
+        fact_movies AS fm
+    INNER JOIN dim_people AS dp ON fm.director_id = dp.person_id
+    INNER JOIN dim_genres AS dg ON fm.genre_id = dg.genre_id
+    INNER JOIN ratings_staging AS r ON fm.movie_id = r.movie_id
+    WHERE 
+        dg.genre_name IN (SELECT genre FROM top3_genre)
+        AND r.avg_rating > 6
+    GROUP BY 
+        dp.name, dg.genre_name
 )
 SELECT director_name, movie_count
 FROM top3_director
 WHERE director_rank <= 3;
-
 ```
 ---
 ## Graf 5: Najobľúbenejší herci podľa počtu odohraných úloh
 Táto vizualizácia ukazuje 10 najobľúbenejších hercov a herečiek na základe počtu ich úloh vo filmoch. Umožňuje identifikovať hercov, ktorí sú najžiadanejší v priemysle.
 ```sql
 SELECT
-    n.name AS actor_name,
+    dp.name AS actor_name,
     COUNT(*) AS total_roles
-FROM role_mapping AS rm
-JOIN names AS n ON rm.name_id = n.id
-WHERE rm.category IN ('actor', 'actress')
-GROUP BY n.name
-ORDER BY total_roles DESC
+FROM 
+    role_mapping_staging AS rm
+JOIN dim_people AS dp ON rm.name_id = dp.person_id
+WHERE 
+    rm.category IN ('actor', 'actress')
+GROUP BY 
+    dp.name
+ORDER BY 
+    total_roles DESC
 LIMIT 10;
-
 ```
 ---
 ## Graf 6: Počet filmov podľa krajín
 Táto vizualizácia zobrazuje počet filmov vyrobených v jednotlivých krajinách. Pomáha analyzovať, ktoré krajiny dominujú vo filmovej produkcii.
 ```sql
-SELECT m.country,
-       COUNT(m.id) AS movie_count
-FROM movie AS m
-GROUP BY m.country
-ORDER BY movie_count DESC
+SELECT 
+    dm.country,
+    COUNT(dm.movie_id) AS movie_count
+FROM 
+    dim_movies AS dm
+GROUP BY 
+    dm.country
+ORDER BY 
+    movie_count DESC
 LIMIT 10;
-
-
 ```
 
 Dashboard poskytuje komplexný prehľad údajov a odpovedá na dôležité otázky týkajúce sa trendov vo filmovom priemysle, popularity filmov a výkonov režisérov a hercov. Vizualizácie uľahčujú interpretáciu údajov a možno ich použiť na zlepšenie odporúčacích systémov, vývoj marketingových stratégií a analýzu filmových trendov.
