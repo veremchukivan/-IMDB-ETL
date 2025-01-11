@@ -4,7 +4,7 @@ CREATE SCHEMA imdb_etl.staging;
 
 USE imdb_etl.staging;
 
--- creat staging table
+-- create staging table
 CREATE OR REPLACE TABLE movies_staging (
     id VARCHAR(10) PRIMARY KEY,
     title VARCHAR(200),
@@ -55,13 +55,13 @@ CREATE OR REPLACE TABLE role_mapping_staging (
 -- create stage
 CREATE OR REPLACE STAGE imdbSt;
 
--- load dat
+-- lead data  into staging table 
 COPY INTO movies_staging
 FROM @imdbSt/movie.csv
 FILE_FORMAT = (TYPE = 'CSV' FIELD_OPTIONALLY_ENCLOSED_BY = '"' SKIP_HEADER = 1);
 
 COPY INTO genres_staging
-FROM @imdbSt/genre.csv
+FROM @imdbSt/ganre.csv
 FILE_FORMAT = (TYPE = 'CSV' FIELD_OPTIONALLY_ENCLOSED_BY = '"' SKIP_HEADER = 1);
 
 COPY INTO role_mapping_staging
@@ -80,6 +80,11 @@ COPY INTO name_staging
 FROM @imdbSt/names.csv
 FILE_FORMAT = (TYPE = 'CSV' FIELD_OPTIONALLY_ENCLOSED_BY = '"' SKIP_HEADER = 1)
 ON_ERROR = 'CONTINUE';
+
+SELECT * from movies_staging;
+SELECT * from genres_staging;
+select * from director_mapping_staging;
+select * from role_mapping_staging;
 
 -- dim_movies
 CREATE OR REPLACE TABLE dim_movies AS
@@ -101,22 +106,31 @@ SELECT DISTINCT
     n.name,
     r.category AS role,
     n.known_for_movies,
-    n.date_of_birth
+    n.date_of_birth,
+    dms.movie_id AS directed_movie_id  
 FROM name_staging n
-LEFT JOIN role_mapping_staging r ON n.id = r.name_id;
+LEFT JOIN role_mapping_staging r ON n.id = r.name_id
+LEFT JOIN director_mapping_staging dms ON n.id = dms.name_id;  
+
+
+
+
+
 -- dim_genres
 CREATE OR REPLACE TABLE dim_genres AS 
 SELECT DISTINCT
-    ROW_NUMBER() OVER (ORDER BY genre) AS genre_id,
+    genre AS genre_id,     
     genre AS genre_name                             
 FROM genres_staging;
+
+
 
 -- fact_movies
 CREATE OR REPLACE TABLE fact_movies AS
 SELECT DISTINCT
     m.id AS movie_id,                 
-    dg.genre_id,                      
-    p.person_id AS director_id,                             
+    dg.genre_id,                       
+    dp.person_id AS director_id,     
     r.total_votes,                    
     r.avg_rating,                     
     m.duration                        
@@ -124,9 +138,18 @@ FROM movies_staging m
 LEFT JOIN ratings_staging r ON m.id = r.movie_id         
 LEFT JOIN genres_staging g ON m.id = g.movie_id           
 LEFT JOIN dim_genres dg ON g.genre = dg.genre_name        
-LEFT JOIN dim_people p ON p.role = 'Director' AND m.id = p.known_for_movies;
+LEFT JOIN dim_people dp ON dp.known_for_movies = m.id;
 
--- delating staging table
+
+
+
+SELECT * FROM fact_movies;
+select * from dim_people;
+select * from dim_genres;
+select * from dim_movies;
+
+
+
 DROP TABLE IF EXISTS movies_staging;
 DROP TABLE IF EXISTS genres_staging;
 DROP TABLE IF EXISTS role_mapping_staging;
